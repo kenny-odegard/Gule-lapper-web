@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="no">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
+  <meta name="theme-color" content="#f7efdc" />
+  <meta name="description" content="Din private tavle med flyttbare huskelapper." />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <title>Gule lapper</title>
+  <style>
+    :root { color-scheme: light; --ink:#2b2d31; --paper:#f7efdc; --surface:#fffdf7; --border:#ded5bd; }
+    * { box-sizing: border-box; }
+    html,body { margin:0; width:100%; min-height:100%; font-family:system-ui,-apple-system,Roboto,sans-serif; color:var(--ink); background:var(--paper); }
+    button,input,textarea { font:inherit; }
+    button { cursor:pointer; }
+    .app { min-height:100dvh; display:flex; flex-direction:column; }
+    header { padding:calc(12px + env(safe-area-inset-top)) 14px 12px; display:flex; align-items:center; gap:10px; background:#fffaf0; border-bottom:1px solid var(--border); }
+    h1 { font-size:21px; letter-spacing:-.5px; margin:0; }
+    .sub { font-size:11px; color:#766f60; margin-top:1px; }
+    .head-text { flex:1; min-width:0; }
+    .btn { appearance:none; border:1px solid #cfc4ab; background:#fffdf7; padding:10px 12px; border-radius:12px; color:#262626; font-weight:650; touch-action:manipulation; }
+    .btn.primary { color:white; background:#272727; border-color:#272727; }
+    .btn:focus-visible,.note:focus-visible { outline:3px solid #4a88d4; outline-offset:2px; }
+    .board-shell { flex:1; padding:12px; display:flex; flex-direction:column; gap:8px; min-height:0; }
+    .board-wrap { width:100%; flex:1; min-height: min(78dvh,650px); }
+    .board { width:100%; height:100%; min-height:450px; position:relative; overflow:hidden; border-radius:20px; background:radial-gradient(#e4d9be 0.7px, transparent 0.8px) 0 0 / 20px 20px,linear-gradient(145deg,#fdf6e6,#f7eacb); box-shadow:inset 0 0 0 1px #e6d8b9,0 3px 12px #5e4a2314; touch-action:pan-y; }
+    .note { position:absolute; width:42%; height:23%; min-height:100px; border:0; border-radius:4px 11px 9px 5px; box-shadow:2px 5px 8px #382e2235, inset 0 1px 0 #ffffff80; padding:12px 11px; white-space:pre-wrap; overflow:hidden; overflow-wrap:anywhere; text-align:left; font-weight:650; font-size:clamp(14px,3.4vw,19px); line-height:1.23; color:#222; touch-action:none; user-select:none; -webkit-user-select:none; cursor:grab; }
+    .note::before { content:""; position:absolute; top:0; left:0; width:100%; height:6px; background:#ffffff33; }
+    .note.dragging { cursor:grabbing; box-shadow:4px 12px 20px #352a2255; z-index:9999!important; }
+    .note .hint { display:block; opacity:.6; font-size:12px; margin-top:7px; font-weight:500; }
+    .info { display:flex; gap:8px; justify-content:space-between; color:#746b58; font-size:12px; align-items:center; padding:0 4px; }
+    .linkbtn { background:none; border:0; color:#555044; text-decoration:underline; padding:7px 1px; }
+    dialog { border:0; border-radius:20px; padding:0; width:min(92vw,420px); box-shadow:0 22px 70px #0007; }
+    dialog::backdrop { background:#1817129a; }
+    .modal { padding:22px; background:var(--surface); }
+    .modal h2 { font-size:19px; margin:0 0 12px; }
+    textarea { width:100%; height:125px; resize:vertical; border:1px solid #cdc4b5; border-radius:12px; background:white; color:#202020; padding:12px; font-size:17px; }
+    .colors { display:flex; gap:12px; margin:14px 0 20px; }
+    .swatch { height:34px; width:34px; border-radius:50%; border:2px solid transparent; box-shadow:0 0 0 1px #0002; }
+    .swatch.selected { outline:3px solid #333; outline-offset:2px; }
+    .modal-actions { display:flex; gap:9px; justify-content:flex-end; flex-wrap:wrap; }
+    .modal-actions .danger { color:#9a211f; margin-right:auto; }
+    .empty { position:absolute; inset:0; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; color:#7a6a4f; pointer-events:none; padding:30px; }
+    .empty strong { color:#4b4134; font-size:19px; }
+    .empty p { max-width:250px; }
+    .toast { position:fixed; bottom:25px; left:50%; transform:translateX(-50%); padding:12px 18px; background:#262626; color:white; border-radius:12px; box-shadow:0 4px 14px #0004; pointer-events:none; opacity:0; transition:opacity .2s; z-index:10; }
+    .toast.show { opacity:1; }
+    @media (min-width:680px) { .board-shell { width:min(100%,850px); margin:auto; } .note { font-size:clamp(18px,2.5vw,24px); } }
+  </style>
+</head>
+<body>
+<div class="app">
+<header>
+  <span aria-hidden="true" style="font-size:28px">🗒️</span>
+  <div class="head-text"><h1>Gule lapper</h1><div class="sub">Din private husketavle</div></div>
+  <button class="btn" id="menu" aria-label="Flere valg" title="Sikkerhetskopi og gjenopprett">⋯</button>
+  <button class="btn primary" id="add">＋ Ny lapp</button>
+</header>
+<main class="board-shell">
+  <div class="board-wrap"><div class="board" id="board" aria-label="Tavle med huskelapper"></div></div>
+  <div class="info"><span>Dra for å flytte · Trykk for å redigere</span><span id="count">0 lapper</span></div>
+</main>
+</div>
+<dialog id="editor"><form method="dialog" class="modal" id="note-form"><h2 id="editor-title">Ny lapp</h2><textarea id="note-text" placeholder="Hva skal du huske?" maxlength="1000" aria-label="Tekst på huskelappen"></textarea><div class="colors" id="colors" aria-label="Farge på lappen"></div><div class="modal-actions"><button type="button" class="btn danger" id="delete">Slett</button><button type="button" class="btn" id="cancel">Avbryt</button><button type="submit" class="btn primary" id="save">Lagre</button></div></form></dialog>
+<dialog id="settings"><div class="modal"><h2>Sikkerhetskopi</h2><p style="line-height:1.5">Lappene lagres bare i denne nettleseren på denne enheten. De overføres ikke automatisk fra Android-appen eller andre enheter.</p><div class="modal-actions"><button type="button" class="btn" id="export">Last ned kopi</button><button type="button" class="btn" id="import">Les inn kopi</button><button type="button" class="btn primary" id="close-settings">Lukk</button></div><input type="file" id="file" accept="application/json,.json" hidden></div></dialog>
+<div class="toast" id="toast" role="status"></div>
+<script>
+(function(){
+'use strict';
+const KEY='gulelapper.web.v1', C=['#fff08d','#ffbfc7','#c5ead1','#c9ddff','#f5d3ac'];
+const $=id=>document.getElementById(id);
+let notes=[],active=null,activeColor=C[0],z=0,gesture=null,ignoreClickId=null;
+try { const saved=JSON.parse(localStorage.getItem(KEY)||'[]'); if(Array.isArray(saved)) notes=saved.filter(n=>n&&typeof n.id==='string'&&typeof n.text==='string').map(n=>({id:n.id,text:n.text.slice(0,1000),color:C.includes(n.color)?n.color:C[0],x:Math.max(0,Math.min(.58,Number(n.x)||0)),y:Math.max(0,Math.min(.77,Number(n.y)||0)),z:Number(n.z)||0})); }catch(e){}
+z=Math.max(0,...notes.map(n=>n.z));
+const persist=()=>{try { localStorage.setItem(KEY,JSON.stringify(notes)); }catch(e){showToast('Kunne ikke lagre. Sjekk lagringsplass.');}};
+let toastTimer; function showToast(s){$('toast').textContent=s;$('toast').classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').classList.remove('show'),2600);}
+function draw(){const board=$('board');board.replaceChildren();$('count').textContent=`${notes.length} ${notes.length===1?'lapp':'lapper'}`;if(!notes.length){const e=document.createElement('div');e.className='empty';e.innerHTML='<strong>Ingen lapper ennå</strong><p>Trykk «Ny lapp» for å lage den første huskelappen.</p>';board.append(e);return;}
+for(const n of [...notes].sort((a,b)=>a.z-b.z)){const el=document.createElement('button');el.type='button';el.className='note';el.dataset.id=n.id;el.style.left=n.x*100+'%';el.style.top=n.y*100+'%';el.style.background=n.color;el.style.zIndex=n.z;el.textContent=n.text||'Tom lapp';el.title='Dra for å flytte, trykk for å redigere';el.setAttribute('aria-label','Huskelapp: '+n.text);el.addEventListener('pointerdown',e=>startDrag(e,n,el));el.addEventListener('click',()=>{if(ignoreClickId===n.id){ignoreClickId=null;return;}openEditor(n);});board.append(el);}}
+function startDrag(e,n,el){if(e.button!==0||gesture)return;const board=$('board');const r=board.getBoundingClientRect();n.z=++z;el.style.zIndex=n.z;let startX=e.clientX,startY=e.clientY;gesture={id:n.id,pid:e.pointerId,x:n.x,y:n.y,moved:false,r};el.setPointerCapture(e.pointerId);el.addEventListener('pointermove',moveDrag);el.addEventListener('pointerup',endDrag);el.addEventListener('pointercancel',endDrag);
+function moveDrag(ev){if(!gesture||ev.pointerId!==gesture.pid)return;const dx=ev.clientX-startX,dy=ev.clientY-startY;if(Math.hypot(dx,dy)>6)gesture.moved=true;if(!gesture.moved)return;n.x=Math.min(.58,Math.max(0,gesture.x+dx/r.width));n.y=Math.min(.77,Math.max(0,gesture.y+dy/r.height));el.style.left=n.x*100+'%';el.style.top=n.y*100+'%';el.classList.add('dragging');}
+function endDrag(ev){if(!gesture||ev.pointerId!==gesture.pid)return;const moved=gesture.moved;gesture=null;el.classList.remove('dragging');el.removeEventListener('pointermove',moveDrag);el.removeEventListener('pointerup',endDrag);el.removeEventListener('pointercancel',endDrag);if(moved){ignoreClickId=n.id;setTimeout(()=>{if(ignoreClickId===n.id)ignoreClickId=null;},350);}persist();}}
+function openEditor(n){active=n?n.id:null;activeColor=n?n.color:C[notes.length%C.length];$('editor-title').textContent=n?'Rediger lapp':'Ny lapp';$('note-text').value=n?n.text:'';$('delete').hidden=!n;renderColors();$('editor').showModal();$('note-text').focus();}
+function renderColors(){const host=$('colors');host.replaceChildren();for(const c of C){const b=document.createElement('button');b.type='button';b.className='swatch'+(c===activeColor?' selected':'');b.style.background=c;b.setAttribute('aria-label','Velg farge '+c);b.setAttribute('aria-pressed',String(c===activeColor));b.addEventListener('click',()=>{activeColor=c;renderColors();});host.append(b);}}
+$('add').addEventListener('click',()=>openEditor(null));$('cancel').addEventListener('click',()=>$('editor').close());
+$('note-form').addEventListener('submit',e=>{e.preventDefault();const txt=$('note-text').value.trim();if(!txt){showToast('Skriv noe på lappen først');return;}const existing=notes.find(n=>n.id===active);if(existing){existing.text=txt;existing.color=activeColor;existing.z=++z;}else{const i=notes.length;notes.push({id:(crypto.randomUUID?crypto.randomUUID():String(Date.now())+'-'+Math.random()),text:txt,color:activeColor,x:Math.min(.58,.06+(i%3)*.11),y:Math.min(.77,.07+(i%5)*.12),z:++z});}persist();draw();$('editor').close();});
+$('delete').addEventListener('click',()=>{if(!active)return;notes=notes.filter(n=>n.id!==active);persist();draw();$('editor').close();showToast('Lappen er slettet');});
+$('menu').addEventListener('click',()=>$('settings').showModal());$('close-settings').addEventListener('click',()=>$('settings').close());
+$('export').addEventListener('click',()=>{const blob=new Blob([JSON.stringify({version:1,notes},null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='gulelapper-sikkerhetskopi.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1500);});
+$('import').addEventListener('click',()=>$('file').click());$('file').addEventListener('change',async e=>{const file=e.target.files[0];if(!file)return;try{const data=JSON.parse(await file.text());if(!Array.isArray(data.notes))throw Error();if(!confirm('Erstatte alle lappene på denne enheten med sikkerhetskopien?'))return;notes=data.notes.filter(n=>n&&typeof n.text==='string').map((n,i)=>({id:typeof n.id==='string'?n.id:String(i)+'-'+Date.now(),text:n.text.slice(0,1000),color:C.includes(n.color)?n.color:C[0],x:Math.max(0,Math.min(.58,Number(n.x)||0)),y:Math.max(0,Math.min(.77,Number(n.y)||0)),z:Number(n.z)||i}));z=Math.max(0,...notes.map(n=>n.z));persist();draw();$('settings').close();showToast('Sikkerhetskopien er lest inn');}catch(err){showToast('Ugyldig sikkerhetskopi');}e.target.value='';});
+draw();
+if('serviceWorker' in navigator && location.protocol.startsWith('http'))window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+})();
+</script>
+</body>
+</html>
